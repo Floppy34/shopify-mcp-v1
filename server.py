@@ -933,5 +933,143 @@ async def shopify_create_webhook(params: CreateWebhookInput) -> str:
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+# ─────────────────────────────────────────
+# PAGES
+# ─────────────────────────────────────────
+
+class ListPagesInput(BaseModel):
+    limit: Optional[int] = None
+    published_status: Optional[str] = None  # published, unpublished, any
+
+@mcp.tool(
+    name="shopify_list_pages",
+    annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+)
+async def shopify_list_pages(params: ListPagesInput) -> str:
+    """List all pages in the Shopify store."""
+    try:
+        query = {}
+        if params.limit:
+            query["limit"] = params.limit
+        if params.published_status:
+            query["published_status"] = params.published_status
+        result = await _request("GET", "/pages.json", params=query)
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
+
+
+class CreatePageInput(BaseModel):
+    title: str
+    body_html: str
+    handle: Optional[str] = None
+    published: Optional[bool] = True
+
+@mcp.tool(
+    name="shopify_create_page",
+    annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True}
+)
+async def shopify_create_page(params: CreatePageInput) -> str:
+    """Create a new page in the Shopify store."""
+    try:
+        payload = {
+            "page": {
+                "title": params.title,
+                "body_html": params.body_html,
+                "published": params.published,
+            }
+        }
+        if params.handle:
+            payload["page"]["handle"] = params.handle
+        result = await _request("POST", "/pages.json", json=payload)
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
+
+
+class UpdatePageInput(BaseModel):
+    page_id: int
+    title: Optional[str] = None
+    body_html: Optional[str] = None
+    published: Optional[bool] = None
+
+@mcp.tool(
+    name="shopify_update_page",
+    annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+)
+async def shopify_update_page(params: UpdatePageInput) -> str:
+    """Update an existing page in the Shopify store."""
+    try:
+        payload = {"page": {}}
+        if params.title is not None:
+            payload["page"]["title"] = params.title
+        if params.body_html is not None:
+            payload["page"]["body_html"] = params.body_html
+        if params.published is not None:
+            payload["page"]["published"] = params.published
+        result = await _request("PUT", f"/pages/{params.page_id}.json", json=payload)
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
+
+
+# ─────────────────────────────────────────
+# THEMES & TEMPLATES
+# ─────────────────────────────────────────
+
+class ListThemesInput(BaseModel):
+    pass
+
+@mcp.tool(
+    name="shopify_list_themes",
+    annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+)
+async def shopify_list_themes(params: ListThemesInput) -> str:
+    """List all themes in the Shopify store."""
+    try:
+        result = await _request("GET", "/themes.json")
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
+
+
+class GetThemeAssetsInput(BaseModel):
+    theme_id: int
+
+@mcp.tool(
+    name="shopify_get_theme_assets",
+    annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+)
+async def shopify_get_theme_assets(params: GetThemeAssetsInput) -> str:
+    """List all assets (files) in a Shopify theme."""
+    try:
+        result = await _request("GET", f"/themes/{params.theme_id}/assets.json")
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
+
+
+class CreateThemeAssetInput(BaseModel):
+    theme_id: int
+    key: str        # e.g. "templates/page.10-raisons.liquid"
+    value: str      # file content
+
+@mcp.tool(
+    name="shopify_create_theme_asset",
+    annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+)
+async def shopify_create_theme_asset(params: CreateThemeAssetInput) -> str:
+    """Create or update a file in a Shopify theme (templates, snippets, etc.)."""
+    try:
+        payload = {
+            "asset": {
+                "key": params.key,
+                "value": params.value
+            }
+        }
+        result = await _request("PUT", f"/themes/{params.theme_id}/assets.json", json=payload)
+        return _fmt(result)
+    except Exception as e:
+        return _fmt({"error": str(e)})
 if __name__ == "__main__":
     mcp.run(transport=MCP_TRANSPORT)
